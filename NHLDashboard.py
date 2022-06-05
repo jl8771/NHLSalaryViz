@@ -17,6 +17,9 @@ app = Dash(__name__)
 #Clear the layout and do not display exception till callback gets executed
 app.config.suppress_callback_exceptions = True
 
+stats_columns = ['Cap Hit','GP','G','A','P','PPG','+/-','PIM','S','S%','FOL','FOW','FOT', 'FO%',
+            'ToI','ToI PP','PP G','PP A','PP P','ToI SH','SH G','SH A','SH P','HIT','BLK','TK','GV','Turnover Diff']
+
 app.layout = html.Div([
     html.Div([
         html.Div(id='dummy'),
@@ -44,14 +47,35 @@ app.layout = html.Div([
                 html.Div(id='player-info-output-wrapper'),
                 html.Div(id='stats-output-wrapper'),
             ]),
-            dcc.Tab(label='League Stats Browser', value='League Stats Browser', children=[
+            dcc.Tab(label='Data Summary', value='Data Summary', children=[
+                html.H3('Select A Category'),
+                dcc.Dropdown(
+                    id='stats-select',
+                    options=stats_columns,
+                    value=stats_columns[0]
+                ),
+                dcc.Input(
+                    id='stat-min',
+                    type='number',
+                    placeholder='Minimum value (Inclusive)',
+                    style={'height': '30px', 'width': '10%'}
+                ),
+                dcc.Input(
+                    id='stat-max',
+                    type='number',
+                    placeholder='Maximum value (Inclusive)',
+                    style={'height': '30px', 'width': '10%'}
+                ),
+                html.Div(id='league-output-wrapper'),
+            ]),
+            dcc.Tab(label='Raw Data Viewer', value='Raw Data Viewer', children=[
                 html.H3('Select A Season'),
                 dcc.Dropdown(
                     id='season-select',
                     options=data['season'].unique(),
                     value=data['season'].unique()[0]
                 ),
-                html.Div(id='league-output-wrapper'),
+                html.Div(id='raw-data-output-wrapper'),
             ]),
             dcc.Tab(label='Graph View', value='Graph View', children=[
                 html.Div(id='graph-output-wrapper'),
@@ -62,7 +86,7 @@ app.layout = html.Div([
 ])
 
 @app.callback(
-    Output('league-output-wrapper', 'children'),
+    Output('raw-data-output-wrapper', 'children'),
     Input('season-select', 'value'))
 def render_radio(season): 
     stats_df = data[data['season'] == season]
@@ -107,15 +131,81 @@ def render_radio(season):
     stats_df = stats_df[['Name', 'Position', 'Shoots', 'DoB', 'Cap Hit', 'GP', 'G', 'A', 'P', 'PPG', '+/-', 'PIM', 'S', 'S%', 'AToI',
                          'PP G', 'PP A', 'PP P', 'AToI PP', 'SH G', 'SH A', 'SH P', 'AToI SH',
                          'FOW', 'FOL', 'FOT', 'FO%', 'HIT', 'BLK', 'TK', 'GV', 'Turnover Diff']]
-    return dash_table.DataTable(
-                            data=stats_df.to_dict('records'),
-                            columns=[
-                            {'name': i, 'id': i, 'deletable': False} for i in stats_df.columns
-                                if i != 'id'
-                            ],
-                            id='league-tbl',
-                            sort_action='native',
-                            sort_mode='single')
+    return html.Div([
+        dash_table.DataTable(
+            data=stats_df.to_dict('records'),
+            columns=[{'name': i, 'id': i, 'deletable': False} for i in stats_df.columns
+                if i != 'id'],
+            id='league-tbl',
+            sort_action='native',
+            sort_mode='single'
+        )
+    ])
+    
+@app.callback(
+    Output('league-output-wrapper', 'children'),
+    Input('stats-select', 'value'),
+    Input('stat-min', 'value'),
+    Input('stat-max', 'value'))
+def render_overview(stat, min_val, max_val):
+    stats_df = data.copy()
+    stats_df.drop(['player_id', 'firstName', 'lastName', 'season', 'shootsCatches', 'primaryPosition'], axis=1, inplace=True)
+    stats_df.rename(columns={'salary': 'Cap Hit',
+                             'gamesPlayed': 'GP',
+                             'goals': 'G',
+                             'assists': 'A',
+                             'points': 'P',
+                             'pointsPerGame': 'PPG',
+                             'plusMinus': '+/-',
+                             'penaltyMinutes': 'PIM',
+                             'shots': 'S',
+                             'shootingPercentage': 'S%',
+                             'faceOffLosses': 'FOL',
+                             'faceOffWins': 'FOW',
+                             'faceOffTaken': 'FOT',
+                             'faceOffPercentage': 'FO%',
+                             'avgTimeOnIce': 'AToI',
+                             'timeOnIce': 'ToI',
+                             'avgPowerPlayTimeOnIce': 'AToI PP',
+                             'powerPlayTimeOnIce': 'ToI PP',
+                             'powerPlayGoals': 'PP G',
+                             'powerPlayAssists': 'PP A',
+                             'powerPlayPoints': 'PP P',
+                             'avgShortHandedTimeOnIce': 'AToI SH',
+                             'shortHandedTimeOnIce': 'ToI SH',
+                             'shortHandedGoals': 'SH G',
+                             'shortHandedAssists': 'SH A',
+                             'shortHandedPoints': 'SH P',
+                             'hits': 'HIT',
+                             'blocks': 'BLK',
+                             'takeaways': 'TK',
+                             'giveaways': 'GV',
+                             'turnoverDifferential': 'Turnover Diff'}, inplace=True)
+    stats_df = stats_df[['Cap Hit', 'GP', 'G', 'A', 'P', 'PPG', '+/-', 'PIM', 'S', 'S%', 'AToI', 'ToI',
+                         'PP G', 'PP A', 'PP P', 'AToI PP', 'ToI PP', 'SH G', 'SH A', 'SH P', 'AToI SH', 'ToI SH',
+                         'FOW', 'FOL', 'FOT', 'FO%', 'HIT', 'BLK', 'TK', 'GV', 'Turnover Diff']]
+    
+    stats = stats_df[stat].describe()
+    if (min_val == None):
+         min_val = -100
+    if (max_val == None):
+        max_val = stats['max']
+    mask = (stats_df[stat] >= min_val) & (stats_df[stat] <= max_val)
+    stats_df = stats_df[mask]
+    return html.Div([
+        html.H4('Count: ' + str(stats['count'].round(0))),
+        html.H4('Mean: ' + str(stats['mean'].round(0))),
+        html.H4('Std Dev: ' + str(stats['std'].round(2))),
+        html.H4('Min: ' + str(stats['min'])),
+        html.H4('Max: ' + str(stats['max'])),
+        html.H4('25% IQR: ' + str(stats['25%'])),
+        html.H4('50% IQR: ' + str(stats['50%'])),
+        html.H4('75% IQR: ' + str(stats['75%'])),
+        dcc.Graph(figure=px.histogram(stats_df, x=stat)),
+        dcc.Graph(figure=px.box(stats_df, x=stat, points='all'))
+    ])
+    
+    
 
 @app.callback(
     Output('player-info-output-wrapper', 'children'),
@@ -212,9 +302,10 @@ def render_graph(x):
     assists_pie = px.pie(plot_df, values='A', names='Position', hole=0.25)
     points_pie = px.pie(plot_df, values='P', names='Position', hole=0.25)
     salary_pie = px.pie(plot_df, values='Cap Hit', names='Position', hole=0.25)
-    pie_fig = sp.make_subplots(rows=1, cols=4,
-                               subplot_titles=('Goals', 'Assists', 'Points', 'Cap Hit'),
-                               specs=[[{'type':'domain'}, {'type':'domain'}, {'type':'domain'}, {'type':'domain'}]])
+    position_pie = px.histogram(plot_df, x='Position')
+    pie_fig = sp.make_subplots(rows=1, cols=5,
+                               subplot_titles=('Goals', 'Assists', 'Points', 'Cap Hit', 'Position'),
+                               specs=[[{'type':'domain'}, {'type':'domain'}, {'type':'domain'}, {'type':'domain'}, {'type':'xy'}]])
     for trace in range(len(goals_pie['data'])):
         pie_fig.append_trace(goals_pie['data'][trace], row=1,col=1)
     for trace in range(len(assists_pie['data'])):
@@ -223,6 +314,8 @@ def render_graph(x):
         pie_fig.append_trace(points_pie['data'][trace], row=1,col=3)
     for trace in range(len(salary_pie['data'])):
         pie_fig.append_trace(salary_pie['data'][trace], row=1,col=4)
+    for trace in range(len(position_pie['data'])):
+        pie_fig.append_trace(position_pie['data'][trace], row=1,col=5)
         
     goals_scatter = px.scatter(goals_df, x='G', y='Cap Hit')
     assists_scatter = px.scatter(assists_df, x='A', y='Cap Hit')
@@ -240,7 +333,6 @@ def render_graph(x):
             html.H3('Positional Breakdown'),
             dcc.Graph(
                 id='plot-1',
-                #figure=px.pie(plot_df, values='goals', names='primaryPosition', hole=0.25)
                 figure=pie_fig
             ),
             html.Br(),
