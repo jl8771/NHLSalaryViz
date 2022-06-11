@@ -31,7 +31,7 @@ app.layout = html.Div([
                     id='search',
                     placeholder='Enter Player Name',
                     value='Sidney Crosby',
-                    style={'width': '50%', 'height': '50px', 'resize': 'none'},
+                    style={'width': '30%', 'height': '20px', 'resize': 'none'},
                     draggable='false'
                 ),
                 html.H3('Allow Multiple Players'),
