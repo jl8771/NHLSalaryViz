@@ -1,9 +1,7 @@
 import os
 import pandas as pd
 
-os.chdir('..')
-os.chdir('stagedcsv')
-
+os.chdir('stagedcsv/')
 filenames = [_ for _ in os.listdir() if _.endswith('.csv')]
 dfs = []
 for file in filenames:
@@ -16,5 +14,4 @@ output = pd.concat(dfs)
 output = output[output['salary'] != -111]
 output = output.dropna()
 
-output
 output.to_csv('combinedstats.csv', index=False)

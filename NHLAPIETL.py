@@ -13,9 +13,9 @@ import sys
 season_to_edit = sys.argv[1]
 
 #Read CSVs for player stats, games and player info
-stats_df = pd.read_csv('game_skater_stats.csv')
-games_df = pd.read_csv('game.csv', usecols=['game_id','season', 'type'])
-players_df = pd.read_csv('player_info.csv', usecols=['player_id', 'firstName', 'lastName', 'birthDate', 'primaryPosition', 'shootsCatches'], parse_dates=['birthDate'])
+stats_df = pd.read_csv('input/game_skater_stats.csv')
+games_df = pd.read_csv('input/game.csv', usecols=['game_id','season', 'type'])
+players_df = pd.read_csv('input/player_info.csv', usecols=['player_id', 'firstName', 'lastName', 'birthDate', 'primaryPosition', 'shootsCatches'], parse_dates=['birthDate'])
 
 #Stage 1: Merge game stats and game info, adding season and type of game (playoff or regular season). Select only games in desired season and only regular season games
 stage_1 = stats_df.merge(games_df, how='left', left_on='game_id', right_on='game_id')
@@ -145,14 +145,15 @@ def findContract(fullname, season, maxProgress):
             col = row.find_all('td')
             if col[0].text == season:
                 count = count + 1
-                #print(' ' * 75, end='\r')
-                print(count, '/', maxProgress, ' ', fullname, end='\r')
-                if col[2].text in ['NHL', 'KHL', 'AHL', 'ECHL', 'International', 'Spengler Cup', 'NL', 'WC', 'U20-Elit', 'EHT', 'WJC-20']: #If not valid salary table
+                print(' ' * 75, end='\r')
+                print(count, '/', maxProgress, end='\r')
+                if not any(char.isdigit() for char in col[2].text): #If not valid salary table
                     return -111
                 return int(''.join(re.findall(r'\d', col[2].text)))
 
 #Get salary value for 
 df['salary'] = df.apply(lambda x: findContract(x['fullname'], x['season'], df.shape[0]), axis=1)
+df['salary'].fillna(-111, inplace=True)
 df['salary'] = df['salary'].astype('int64')
 
 output = df.reset_index()
