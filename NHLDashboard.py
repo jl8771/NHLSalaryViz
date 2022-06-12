@@ -20,6 +20,10 @@ app.config.suppress_callback_exceptions = True
 stats_columns = ['Cap Hit','GP','G','A','P','PPG','+/-','PIM','S','S%','FOL','FOW','FOT', 'FO%',
             'ToI','ToI PP','PP G','PP A','PP P','ToI SH','SH G','SH A','SH P','HIT','BLK','TK','GV','Turnover Diff']
 
+seasons = list(data['season'].unique())
+seasons.insert(0, 'All')
+strength = ['All', 'EV', 'PP', 'SH']
+
 app.layout = html.Div([
     html.Div([
         html.Div(id='dummy'),
@@ -35,14 +39,6 @@ app.layout = html.Div([
                     draggable='false'
                 ),
                 html.H3('Allow Multiple Players'),
-                dcc.RadioItems(
-                    id='select-multiple',
-                    options=[
-                        {'label': 'Yes', 'value': True, 'disabled': True},
-                        {'label': 'No', 'value': False, 'disabled': True}],
-                    inline=True,
-                    value=False
-                ),
                 html.Div(id='player-names-wrapper'),
                 html.Div(id='player-info-output-wrapper'),
                 html.Div(id='stats-output-wrapper'),
@@ -71,13 +67,25 @@ app.layout = html.Div([
             dcc.Tab(label='Raw Data Viewer', value='Raw Data Viewer', children=[
                 html.H3('Select A Season'),
                 dcc.Dropdown(
-                    id='season-select',
+                    id='season-select-1',
                     options=data['season'].unique(),
                     value=data['season'].unique()[0]
                 ),
                 html.Div(id='raw-data-output-wrapper'),
             ]),
             dcc.Tab(label='Graph View', value='Graph View', children=[
+                html.H3('Select A Season'),
+                dcc.Dropdown(
+                    id='season-select-2',
+                    options=seasons,
+                    value=seasons[0]
+                ),
+                html.H3('Select Strength'),
+                dcc.Dropdown(
+                    id='strength-select-2',
+                    options=strength,
+                    value=strength[0]
+                ),
                 html.Div(id='graph-output-wrapper'),
             ]),
         ]),
@@ -109,9 +117,8 @@ def render_stats(name):
 #Callback for individual player stat viewer. Takes player name as input. Outputs text with datatable
 @app.callback(
     Output('stats-output-wrapper', 'children'),
-    Input('search', 'value'),
-    Input('select-multiple', 'value'))
-def render_stats(inputName, multiple):
+    Input('search', 'value'))
+def render_stats(inputName):
     #Find player by first/last name
     stats_df = data.drop(['player_id', 'birthDate', 'primaryPosition', 'shootsCatches'], axis=1)
     name = inputName.lower()
@@ -170,7 +177,7 @@ def render_stats(inputName, multiple):
 #Callback for raw data viewer. Takes season as input. Outputs datatable
 @app.callback(
     Output('raw-data-output-wrapper', 'children'),
-    Input('season-select', 'value'))
+    Input('season-select-1', 'value'))
 def render_radio(season): 
     stats_df = data[data['season'] == season]
     #Minimum games played
@@ -297,13 +304,32 @@ def render_overview(stat, min_val, max_val):
         dcc.Graph(figure=px.box(stats_df, x=stat, points='all'))
     ])
 
-#Callback for raw data viewer. Takes nothing as input. Outputs multiple graph objects
+#Callback for raw data viewer. Takes strength and season as input. Outputs multiple graph objects
 @app.callback(
     Output('graph-output-wrapper', 'children'),
-    Input('dummy', 'children'))
-def render_graph(x):
+    Input('season-select-2', 'value'),
+    Input('strength-select-2', 'value'))
+def render_graph(season, strength):
+    plot_df = data.filter(['gamesPlayed', 'salary', 'goals', 'assists', 'points', 'primaryPosition', 'season',
+                           'powerPlayGoals', 'powerPlayAssists', 'powerPlayPoints',
+                           'shortHandedGoals', 'shortHandedAssists', 'shortHandedPoints'])
+    #Filter based on selections
+    if season != 'All':
+        plot_df = plot_df[plot_df['season'] == season]
+    if strength == 'EV':
+        plot_df['goals'] = plot_df['goals'] - plot_df['powerPlayGoals'] - plot_df['shortHandedGoals']
+        plot_df['assists'] = plot_df['assists'] - plot_df['powerPlayAssists'] - plot_df['shortHandedAssists']
+        plot_df['points'] = plot_df['points'] - plot_df['powerPlayPoints'] - plot_df['shortHandedPoints']
+    elif strength == 'PP':
+        plot_df['goals'] = plot_df['powerPlayGoals']
+        plot_df['assists'] = plot_df['powerPlayAssists']
+        plot_df['points'] = plot_df['powerPlayPoints']
+    elif strength == 'SH':
+        plot_df['goals'] = plot_df['shortHandedGoals']
+        plot_df['assists'] = plot_df['shortHandedAssists']
+        plot_df['points'] = plot_df['shortHandedPoints']
+    
     #Filter columns to be used, rename columns
-    plot_df = data.filter(['gamesPlayed', 'salary', 'goals', 'assists', 'points', 'primaryPosition'])
     plot_df = plot_df[plot_df['gamesPlayed'] > 15]
     plot_df = plot_df.rename(columns={'primaryPosition': 'Position',
                             'gamesPlayed': 'GP',
