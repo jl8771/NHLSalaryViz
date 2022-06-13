@@ -11,8 +11,11 @@ from pathlib import Path
 
 data =  pd.read_csv('processedcsv/combinedstats.csv')
 
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+
 # Create a dash application
-app = Dash(__name__)
+app = Dash(__name__, external_stylesheets=external_stylesheets)
 
 #Clear the layout and do not display exception till callback gets executed
 app.config.suppress_callback_exceptions = True
@@ -386,10 +389,24 @@ def render_graph(season, strength):
         ),
         html.Br(),
         html.H3('Goals vs Cap Hit'),
+        html.Div([
+            html.Div([
+                dcc.Graph(
+                id='plot-2',
+                figure=px.violin(plot_df, x='Position', y='Cap Hit')
+                )
+            ], className = 'six columns'),
+            html.Div([
+                dcc.Graph(
+                id='plot-3',
+                figure=px.strip(plot_df, x='Position', y='Cap Hit')
+                )
+            ], className = 'six columns')
+        ], className='row'),
         dcc.Graph(
-            id='plot-2',
+            id='plot-4',
             figure=scatter_fig
-         ),
+        ),
     ])
 
 #Clientside callback for changing document title based on tab selected. Takes active tab value as input. Outputs document title
